@@ -1,0 +1,74 @@
+
+
+; Get attr address
+; B = Y character position
+; C = X character position
+; Returns address in HL
+GetAttrAddress
+	ld a,b              ; x position.
+	rrca                ; multiply by 32.
+	rrca
+	rrca
+	ld l,a              ; store away in l.
+	and 3               ; mask bits for high byte.
+	add a,88            ; 88*256=22528, start of attributes.
+	ld h,a              ; high byte done.
+	ld a,l              ; get x*32 again.
+	and 224             ; mask low byte.
+	ld l,a              ; put in l.
+	ld a,c              ; get y displacement.
+	add a,l             ; add to low byte.
+	ld l,a              ; hl=address of attributes.
+	ret
+
+
+; Fill a box of the screen with a solid colour
+;  A: The colour
+; HL: Address in the attribute map
+;  C: Width
+;  B: Height
+;
+Fill_Attr
+	LD DE,32
+1:	PUSH HL	
+	PUSH BC
+2:	LD (HL), A
+	INC L
+	DEC C
+	JR NZ, 2B
+	POP BC
+	POP HL
+	ADD HL,DE
+	DJNZ 1B
+	RET
+
+
+
+ScreenWidthChars	equ 32
+ScreenHeightChars	equ 24
+
+
+AttrStart		equ #5800
+AttrLength		equ ScreenWidthChars * ScreenHeightChars
+
+
+Black		equ %000000
+Blue		equ %000001
+Red		equ %000010
+Magenta		equ %000011
+Green		equ %000100
+Cyan		equ %000101
+Yellow		equ %000110
+White		equ %000111
+
+pBlack		equ Black << 3
+pBlue		equ Blue << 3
+pRed		equ Red << 3
+pMagenta	equ Magenta << 3
+pGreen		equ Green << 3
+pCyan		equ Cyan << 3
+pYellow		equ Yellow << 3
+pWhite		equ White << 3
+Bright		equ %1000000
+
+

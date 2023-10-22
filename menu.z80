@@ -1,0 +1,402 @@
+
+MenuPageStart
+	xor a : ld (menuItemCurrent),a
+	ld a,Yellow | pBlack : call Clear_Screen		; yellow on black clear screen
+	call DrawMenuGfx
+	ld ix, Menu_Text_Start : call Print_String		; print options
+	call PrintMbs						; print madebyme
+	ld hl, Menu_Main : call MenuReadKeys
+	cp 0
+	ret z							; selected start game
+	dec a
+	jr z, MenuPageOptions					; selected options menu
+	ret							; else must be quit game
+
+
+MenuPageOptions
+	ld a,Yellow | pBlack : call Clear_Screen
+	xor a : ld (menuItemCurrent),a
+	call DrawMenuGfx
+OptionsMenuNoCls
+	call .optionsMenuSetSoundText
+	ld ix, Menu_Text_RedefineKeys : call Print_String
+	call PrintMbs						; print madebyme
+	ld hl, Menu_Options : call MenuReadKeys
+	cp 0
+	jr z,MenuPageRedefine					; selected redefine keys
+	dec a
+	jr z, .optionsMenuToggleSound				; selected sound
+	jr MenuPageStart						; selected start menu
+.optionsMenuToggleSound
+	ld a,(SoundOn)
+	cp 1
+	jr z, .optionsMenuSetSoundOff
+.optionsMenuSetSoundOn
+	inc a
+	ld (SoundOn),a
+	jr OptionsMenuNoCls
+.optionsMenuSetSoundOff
+	xor a
+	ld (SoundOn),a
+	jr OptionsMenuNoCls
+.optionsMenuSetSoundText
+	ld hl,Menu_Text_Sound_LastChar
+	ld (hl),'N'
+	ld a,(SoundOn)
+	and a
+	ret z
+	ld (hl),'Y'
+	ret
+
+
+
+MenuPageRedefine
+	xor a : ld (menuItemCurrent),a
+	ld a,Yellow | pBlack : call Clear_Screen		; yellow on black clear screen
+	call DrawMenuGfx
+	ld ix, Menu_Text_DefineUp : call Print_String		; print options
+	call PrintMbs						; print madebyme
+.defineKeysMenuContinue
+	ld a,5 : call PrintControls				; print current controls
+	ld hl, Menu_DefineKeys : call MenuReadKeys
+	cp 5
+	jr z, MenuPageOptions					; selected back to - options menu
+
+.defineKey
+	push af : add a,a : ld e,a : ld d,0 : push de		; index and offset into Menu_DefineKeys
+	ld a, pYellow | Black : call MenuDefineCharColour : call DefineKeysPause
+	pop de
+	and a : jr nz, .keyDefined
+	push de
+	ld a, Yellow | pBlack : call MenuDefineCharColour : call DefineKeysPause
+	pop de
+	and a : jr nz, .keyDefined
+	pop af
+	jr .defineKey
+.keyDefined
+	call AsciiToControl	; de = port and mask
+	pop af			; index
+	call SetKey
+	jr .defineKeysMenuContinue
+
+	
+
+
+SetKey	; a = index into Input_Custom, D = port, E = mask
+	push de
+	add a,a
+	ld e,a : ld d,0 : push de : ld a,Yellow | pBlack
+	call MenuDefineCharColour	; a = colour, de = 2 * index of char to colour, trashed hl
+	ld hl, Input_Custom
+	pop bc : pop de
+	add hl,bc
+	ld (hl),d : inc hl : ld (hl), e
+.loop
+	call Read_Keyboard
+	and a
+	jr nz, .loop
+	ret
+
+DefineKeysPause	; Returns A = 0 else A = ascii, Trashed bc, de, hl
+	ld b,20
+.definePauseLoop
+	halt
+	call Read_Keyboard
+	and a
+	ret nz
+	djnz .definePauseLoop
+	ret
+
+PrintControls
+	ld hl,Input_Custom					; game keys
+	ld de,Menu_DefineKeys + 1				; ptr to ptr to item
+	ld b,a							; b = count of keys
+	xor a							; start at index 0
+.nxtControl
+	push bc							; b = count of keys
+	push af							; index into Input_Custom
+	push hl							; control
+	push de							; Menu_DefineKeys
+	call ControlToAscii					; a = ascii, trashes all reg
+	pop hl							; Menu_DefineKeys
+	ld e,(hl) : inc hl : ld d,(hl) : inc hl			; de = ptr to item
+	push hl
+	ld c,a
+	ld l,MenuDefineKeyXPos : inc de : ld a,(de) : ld h,a	; read items position, draw to fixed pos on the right
+	ld a,c : call MenuPrintCharRepresentation
+	pop de							; pop current pos in Menu_DefineKeys
+	pop hl							; pop control
+	pop af : inc a						; pop and inc index to Input_Custom
+	pop bc							; pop count
+	djnz .nxtControl
+	ret
+
+
+MenuPrintCharRepresentation	; hl = position, A = char, print but if invis print word to describe it
+	cp ' '
+	jr nz, .notSpace
+	ld de, SpaceText
+	jp Print_StringAt
+.notSpace
+	push hl
+	call Print_Char_At
+	pop hl : inc l : push hl : ld a, ' ' : call Print_Char_At
+	pop hl : inc l : push hl : ld a, ' ' : call Print_Char_At
+	pop hl : inc l : push hl : ld a, ' ' : call Print_Char_At
+	pop hl : inc l : ld a, ' ' : jp Print_Char_At
+
+
+SpaceText db "SPACE", 0
+MenuDefineKeyXPos equ 18
+
+
+MenuDefineCharColour	; a = colour, de = 2 * index of char to colour, trashed hl
+	ld hl,Menu_DefineKeys + 1
+	add hl,de
+	ld e,(hl) : inc hl : ld d,(hl) : ex de,hl
+	ld c,MenuDefineKeyXPos : inc hl : ld b,(hl)
+	push af : call GetAttrAddress : pop af
+	ld (hl),a
+	ret
+
+
+
+; Draw the top centre gfx in the menu
+DrawMenuGfx	; trashed a, bc, de & hl
+	ld bc, $0008 : call GetAttrAddress
+	ld a, pBlack | Green : ld bc, $030c : call Fill_Attr
+	ld bc, $0014 : call GetAttrAddress
+	ld a, pBlack | Green | Bright : ld bc, $0304 : call Fill_Attr
+	ld bc, $0308 : call GetAttrAddress
+	ld a, pBlack | Blue : ld bc, $0110 : call Fill_Attr
+	ld de,MainMenuGfx
+	ld hl, $0008
+	ld bc, $1020
+	call Draw
+	ret
+
+
+
+; print madebystu
+PrintMbs	; trashed: ix, bc, de, hl, a
+	ld ix, Menu_Text_MBS : call Print_String
+	ld bc, (Menu_Text_MBS) : call GetAttrAddress : ld a, pBlack | Blue : ld bc, $0109 : call Fill_Attr
+	ret
+
+
+
+MenuReadKeys	; HL holds array of menu items, ending in 0, returns index of selected item in A
+	ld a,(hl)						; menu item count
+	ld (menuItemCount),a					; save count of menu items
+	inc hl							; hl now equals ptr to first item
+	ld (menuItemStart),hl
+menuReadKeysAgain
+	ld a, pBlack | Green | Bright : call MenuColourCurrent	; highlight it
+	call Read_Controls
+	ld c,a
+	bit 0, a : jr nz, menuReadKeysSelected
+	and %01010 : jr nz, menuReadKeysDown
+	ld a,c : and %10100 : jr nz, menuReadKeysUp
+	call DrawMenuAnim
+	jr menuReadKeysAgain
+menuReadKeysDown
+	ld a,(menuItemCount)
+	ld b,a							; b = item count
+	ld a,(menuItemCurrent)					; a = current
+	inc a
+	cp b							; are they equal?
+	jr z, menuReadKeysDownEnd				; jp if they are equal
+	push af : ld a,Yellow|pBlack : call MenuColourCurrent : pop af
+	ld (menuItemCurrent),a					; save menuItemCurrent + 1
+menuReadKeysDownEnd
+	call menuReadKeysDebounce
+	jr menuReadKeysAgain
+
+menuReadKeysUp
+	ld a,(menuItemCurrent)
+	and a
+	jr nz, menuReadKeysUpActioned
+	call menuReadKeysDebounce
+	jr menuReadKeysAgain
+menuReadKeysUpActioned
+	push af : ld a,Yellow|pBlack : call MenuColourCurrent : pop af
+	dec a
+	ld (menuItemCurrent),a					; next menu item up
+	call menuReadKeysDebounce
+	jr menuReadKeysAgain
+
+
+menuReadKeysSelected
+	call menuReadKeysDebounce
+	ld a,(menuItemCurrent)
+	ret
+menuReadKeysDebounce
+	call Read_Controls
+	and a
+	jr nz, menuReadKeysDebounce
+	ret
+
+
+
+MenuColourCurrent	; A = colour
+	push af
+	ld hl,(menuItemStart)
+	ld a,(menuItemCurrent) : add a,a : ld e,a : ld d,0
+	add hl,de
+	ld e,(hl)
+	inc hl
+	ld d,(hl)
+	ex de,hl
+	pop af : call MenuHighlight				; highlight it
+	ret
+
+MenuHighlight	; IN HL = menu item to highlight, A = colour to set
+	push af
+	ld c,(hl) : inc hl : ld b,(hl) : inc hl			; bc = character position, hl = ptr to first character
+	push hl							; stacked ptr to first character
+	call GetAttrAddress					; hl = attr address
+	ex (sp),hl						; hl = ptr to first character, stacked attr address
+	ld c,0
+menuHighlightCount
+	ld a,(hl)
+	inc hl
+	inc a
+	jr z, menuHighlightCounted				; jp if char was -1
+	inc a
+	jr z, menuHighlightCounted				; jp if char was -2
+	inc c							; char count
+	jr menuHighlightCount
+menuHighlightCounted
+	pop hl							; get attr address and stack is sane
+	pop af
+	ld b, 1 : call Fill_Attr				; draw attr
+	ei : halt : di						; show it
+	ret
+
+
+PlayerAnimDataFrames	db 0,0,2	; current frame, current pause between change, frames to wait before change frame
+PlayerAnimDataDir	db 0,0,$3f	; current direction, current delay before change count, delay before change direction
+PlayerAnimGfx	dw PlayerDownAnim, PlayerRightAnim, PlayerUpAnim, PlayerLeftAnim
+
+DrawMenuAnim
+	ld ix,PlayerAnimDataDir
+	ld a,(ix+1)
+	inc a
+	and (ix+2)
+	ld (ix+1),a
+	jr nz,.noNxtDirChange
+	ld a,(ix+0)
+	inc a
+	and 3
+	ld (ix+0),a
+.noNxtDirChange
+	ld a,(ix+0)
+	add a,a
+	ld e,a
+	ld d,0
+	ld hl,PlayerAnimGfx
+	add hl,de
+	ld e,(hl) : inc hl : ld d,(hl) : ex de,hl
+	call DrawMenuPlayer
+	ret
+
+DrawMenuPlayer
+	;ld hl,PlayerDownAnim			; array of 4 words pointing to each 16x16 pix image
+	ld a,(PlayerAnimDataFrames)
+	add a,a
+	ld e, a
+	ld d,0
+	add hl,de				; hl points to current pointer to image
+	ld e,(hl) : inc hl : ld d,(hl)		; de = 16x16 pixel image
+	ld hl,$0204				; y,x position
+	ld bc,$0210				; 2 bytes wide, 16 pixels tall
+	push de : push bc
+	halt : call Draw
+	pop bc : pop de : ld hl,$021a
+	call Draw
+	ld hl,PlayerAnimDataFrames+2
+	ld a,(PlayerAnimDataFrames + 1) : inc a : ld (PlayerAnimDataFrames + 1),a : and (hl) : jr nz,.noNxtFrame
+	ld a,(PlayerAnimDataFrames) : inc a : and 3 : ld (PlayerAnimDataFrames),a
+.noNxtFrame
+	ret
+
+
+SoundOn db 0		; do we have sound: 1 = Y, 0 = N
+
+menuItemStart dw 0
+menuItemCurrent	db 0
+menuItemCount	db 0
+
+Menu_Text_Start		db 12,8, "Start", -2
+Menu_Text_Options	db 12,10, "Options", -2
+Menu_Text_Quit		db 12,13, "Quit", -1
+
+Menu_Main	db 3
+		dw Menu_Text_Start, Menu_Text_Options, Menu_Text_Quit
+
+Menu_Text_RedefineKeys	db 10,8, "Redefine Keys", -2
+Menu_Text_Sound		db 10,10, "Sound Y", -2
+Menu_Text_Back		db 10,13, "Back", -1
+
+Menu_Text_Sound_LastChar	equ Menu_Text_Back-2
+
+Menu_Options	db 3
+		dw Menu_Text_RedefineKeys, Menu_Text_Sound, Menu_Text_Back
+
+Menu_Text_DefineUp	db 10, 6, "Up", -2
+Menu_Text_DefineDown	db 10, 8, "Down", -2
+Menu_Text_DefineLeft	db 10,10, "Left", -2
+Menu_Text_DefineRight	db 10,12, "Right", -2
+Menu_Text_DefineFire	db 10,14, "Fire", -2
+Menu_Text_DefineBack	db 10,17, "Back", -1
+
+Menu_DefineKeys	db 6
+		dw Menu_Text_DefineUp, Menu_Text_DefineDown, Menu_Text_DefineLeft, Menu_Text_DefineRight, Menu_Text_DefineFire, Menu_Text_DefineBack
+
+Menu_Text_MBS	db 11,23, "MadeByStu", -1
+
+
+
+
+MainMenuGfx
+	db %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000
+	db %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000
+	db %00000011, %11111111, %11111111, %11100000, %00111110, %00000000, %00000000, %00111100, %00111111, %11111111, %11111111, %11000000, %00000000, %00000000, %00000000, %00000000
+	db %00001111, %11111111, %11111111, %11100000, %00111110, %00000000, %00000000, %00111100, %00111111, %11111111, %11111111, %11110000, %00000000, %00000000, %00000000, %00000000
+	db %00011111, %11111111, %11111111, %11110000, %00111100, %00000000, %00000000, %00111100, %00111111, %11111111, %11111111, %11111100, %00000000, %00111110, %00000000, %11110000
+	db %00011111, %11111111, %11111111, %11110000, %00111100, %00000000, %00000000, %00111100, %00111111, %11111111, %11111111, %11111100, %00000000, %11111111, %10000111, %11111000
+	db %00011111, %10000000, %00000000, %00000000, %00111100, %00000000, %00000000, %00111100, %00111100, %00000000, %00000000, %01111100, %00000000, %11111111, %10001111, %11111000
+	db %00011111, %00000000, %00000000, %00000000, %00111100, %00000000, %00000000, %00111100, %00111100, %00000000, %00000000, %00111100, %00000000, %01111111, %11011111, %11110000
+
+	db %00011111, %00000000, %00000000, %00000000, %00111100, %00000000, %00000000, %00111100, %00111100, %00000000, %00000000, %00111100, %00000111, %11111111, %11011111, %11111100
+	db %00011111, %10000000, %00000000, %00000000, %00111100, %00000000, %00000000, %00111100, %00111100, %00000000, %00000000, %00111100, %00001111, %11111111, %11111111, %11111110
+	db %00001111, %11111111, %11111111, %11110000, %00111100, %00000000, %00000000, %00111100, %00111100, %00000000, %00000000, %00111100, %00001111, %11111111, %11111111, %11111111
+	db %00001111, %11111111, %11111111, %11111000, %00111100, %00000000, %00000000, %00111100, %00111100, %00000000, %00000000, %00111100, %00001111, %11111111, %11111111, %11111111
+	db %00000111, %11111111, %11111111, %11111100, %00111100, %00000000, %00000000, %00111100, %00111100, %00000000, %00000000, %00111100, %00000111, %11111111, %10111111, %11111100
+	db %00000011, %11111111, %11111111, %11111100, %00111100, %00000000, %00000000, %00111100, %00111100, %00000000, %00000000, %00111100, %00000001, %11111000, %10111111, %11110000
+	db %00000000, %00000000, %00000000, %11111100, %00111100, %00000000, %00000000, %00111100, %00111100, %00000000, %00000000, %00111100, %00001000, %00000000, %01000001, %11100000
+	db %00000000, %00000000, %00000000, %01111100, %00111100, %00000000, %00000000, %00111100, %00111100, %00000000, %00000000, %00111100, %00001100, %00000011, %10000000, %00001000
+
+	db %00000000, %00000000, %00000000, %00111100, %00111100, %00000000, %00000000, %00111100, %00111100, %00000000, %00000000, %00111100, %00011110, %00000111, %10011000, %00001100
+	db %00000000, %00000000, %00000000, %00111100, %00111100, %00000000, %00000000, %00111100, %00111100, %00000000, %00000000, %00111100, %00011111, %11111111, %10011110, %00011110
+	db %01111000, %00000000, %00000000, %01111100, %00111110, %00000000, %00000000, %01111100, %00111100, %00000000, %00000000, %00111100, %00011111, %11111111, %00011111, %11111110
+	db %11111110, %00000000, %00000000, %11111100, %00111111, %00000000, %00000000, %11111100, %00111100, %00000000, %00000000, %01111100, %00001111, %11111110, %01011111, %11111110
+	db %11111111, %11111111, %11111111, %11111100, %00011111, %11111111, %11111111, %11111000, %00111111, %11111111, %11111111, %11111100, %00000000, %11111110, %01011111, %11110000
+	db %11111111, %11111111, %11111111, %11111100, %00011111, %11111111, %11111111, %11111000, %00111111, %11111111, %11111111, %11111100, %00000001, %11111000, %10001111, %11111000
+	db %00111111, %11111111, %11111111, %11111000, %00001111, %11111111, %11111111, %11110000, %00111111, %11111111, %11111111, %11110000, %00000000, %00000000, %10000001, %11110000
+	db %00000011, %11111111, %11111111, %11110000, %00000011, %11111111, %11111111, %11000000, %00111111, %11111111, %11111111, %11000000, %00000000, %00000001, %00000000, %00000000
+
+	db %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000
+	db %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000
+	db %10000000, %00000000, %00000000, %00100000, %00000000, %00000000, %00010001, %11111111, %11111111, %11111100, %10000000, %00000000, %10000000, %10000000, %00000000, %00000001
+	db %10000000, %00000000, %00000000, %00100000, %00000000, %00000000, %00010010, %00000000, %00000000, %00000000, %10000000, %00000000, %10000000, %10000000, %00000000, %00000001
+	db %10000000, %00000000, %00000000, %00100000, %00000000, %00000000, %00010010, %00000000, %00000000, %00000000, %11111111, %11111111, %11111000, %01111111, %11111111, %11111110
+	db %10000000, %00000000, %00000000, %00100000, %00000000, %00000000, %00010010, %00000000, %00000000, %00000000, %10000000, %00000000, %00000100, %00000000, %00000000, %00000010
+	db %10000000, %00000000, %00000000, %00100000, %00000000, %00000000, %00010010, %00000000, %00000000, %00000000, %10000000, %00000000, %00000100, %00000000, %00000000, %00000010
+	db %11111111, %11111111, %11111111, %00011111, %11111111, %11111111, %11100001, %11111111, %11111111, %11111100, %10000000, %00000000, %00000100, %01111111, %11111111, %11111100
+
+
+	include "lib/output.z80"
+	include "lib/attr.z80"
+	include "lib/keyboard.z80"
+	include "gfx.z80"
