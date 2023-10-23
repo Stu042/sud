@@ -26,7 +26,9 @@
 ; B = width bytes
 ; C = height
 Draw
-	call Get_Char_Address		; hl = screen address
+	push bc
+	call GetScreenAddress
+	pop bc
 .vertLoop
 	push hl
 	push bc
@@ -37,6 +39,34 @@ Draw
 	inc de
 	djnz .horizLoop
 	pop bc
+	pop hl
+	call Pixel_Address_Down
+	dec c
+	jr nz, .vertLoop
+	ret
+
+
+
+; Draw graphic to screen quickly, no checks, no masking just draw.
+; IX points to data:
+; 0,1               2,3       4,5
+; x,y position, width,height, gfx (array of bytes to draw)
+; trashes a, bc, de, hl
+DrawIx
+	ld c,(ix+1)
+	ld b,(ix+0)
+	call GetScreenAddressBC
+	ld e,(ix+4)
+	ld d,(ix+5)
+.vertLoop
+	push hl
+.horizLoop
+	ld a,(de)
+	ld (hl),a
+	inc hl
+	inc de
+	djnz .horizLoop
+	ld b,(ix+0)
 	pop hl
 	call Pixel_Address_Down
 	dec c
@@ -123,6 +153,36 @@ Char_Address_Down:	LD A, L
 			LD H, A
 			RET 
 
+; Get screen address
+; B = Y pixel position
+; C = X byte position
+; Returns address in HL and pixel position within character in A
+GetScreenAddress
+		push hl : pop bc
+GetScreenAddressBC
+		LD A,B          ; Calculate Y2,Y1,Y0
+		AND %00000111   ; Mask out unwanted bits
+		OR %01000000    ; Set base address of screen
+		LD H,A          ; Store in H
+		LD A,B          ; Calculate Y7,Y6
+		RRA             ; Shift to position
+		RRA
+		RRA
+		AND %00011000   ; Mask out unwanted bits
+		OR H            ; OR with Y2,Y1,Y0
+		LD H,A          ; Store in H
+		LD A,B          ; Calculate Y5,Y4,Y3
+		RLA             ; Shift to position
+		RLA
+		AND %11100000   ; Mask out unwanted bits
+		LD L,A          ; Store in L
+		LD A,C          ; Calculate X4,X3,X2,X1,X0
+		AND %00011111   ; Mask out unwanted bits
+		OR L            ; OR with Y5,Y4,Y3
+		LD L,A          ; Store in L
+		RET
+
+
 
 ; Get screen address
 ; B = Y pixel position
@@ -173,8 +233,8 @@ Get_Pixel_Address:	LD A,B				; Calculate Y2,Y1,Y0
 ;.db 64,65,66,67,68,69,70,71,64,65,66...
 
 ; Move HL down one pixel line
-;
-Pixel_Address_Down:	INC H				; Go down onto the next pixel line
+Pixel_Address_Down
+			INC H				; Go down onto the next pixel line
 			LD A,H				; Check if we have gone onto next character boundary
 			AND 7
 			RET NZ				; No, so skip the next bit
@@ -186,9 +246,22 @@ Pixel_Address_Down:	INC H				; Go down onto the next pixel line
 			SUB 8
 			LD H,A
 			RET
+Pixel_Address_DownDE
+			INC d				; Go down onto the next pixel line
+			LD A,d				; Check if we have gone onto next character boundary
+			AND 7
+			RET NZ				; No, so skip the next bit
+			LD A,e				; Go onto the next character line
+			ADD A,32
+			LD e,A
+			RET C				; Check if we have gone onto next third of screen
+			LD A,d				; Yes, so go onto next third
+			SUB 8
+			LD d,A
+			RET
+
 
 ; Move HL up one pixel line
-;
 Pixel_Address_Up:	DEC H				; Go up onto the next pixel line
 			LD A,H				; Check if we have gone onto the next character boundary
 			AND 7

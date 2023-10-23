@@ -1,0 +1,64 @@
+
+
+	DEFINE DEBUG
+	DEFINE USING_INTERRUPTS
+
+	ifdef DEBUG		; if debuging we need interrupts
+		ifndef USING_INTERRUPTS
+			DEFINE USING_INTERRUPTS
+		endif
+	endif
+
+
+; Internal to DebugResetBorder and DebugBorder (call_DebugResetBorder and call_DebugBorder)
+DebugColour	dc 0
+
+
+; Calls halt, then reset to blakc the border colour
+DebugResetBorder
+	call DebugBorder
+	xor a : ld (DebugColour),a
+	ei : halt : di : out (254),a
+	ret
+
+
+
+; Change border colour whenever called, call DebugResetBorder at redraw
+DebugBorder
+	ld a,(DebugColour)
+	inc a : and %111
+	out (254),a
+	ld (DebugColour),a
+	ret
+
+
+
+	IFDEF DEBUG
+		macro DebugResetBorder
+			call DebugResetBorder
+		endm
+		macro DebugBorder
+			call DebugBorder
+		endm
+	else
+		macro DebugResetBorder
+			ei : halt : di
+		endm
+		macro DebugBorder
+		endm
+	endif
+
+
+	ifdef USING_INTERRUPTS
+		macro ENABLE_INTERRUPTS
+			ei
+		endm
+		macro DISABLE_INTERRUPTS
+			di
+		endm
+	else
+		macro ENABLE_INTERRUPTS
+		endm
+		macro DISABLE_INTERRUPTS
+		endm
+	endif

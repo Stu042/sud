@@ -1,61 +1,82 @@
-	DEVICE ZXSPECTRUMNEXT
+	;define SNA
+
+	ifndef SNA
+		DEVICE ZXSPECTRUMNEXT
+	else
+		DEVICE ZXSPECTRUM48
+	endif
 	SLDOPT COMMENT WPMEM, LOGPOINT, ASSERTION
 	ORG $8000
 	jp Start
 stack_top equ $ff40
 
+	include "debug.z80"
+	include "menu.z80"
+	include "lib/output.z80"
+	include "lib/attr.z80"
+	include "lib/keyboard.z80"
+	include "gfx.z80"
+
 
 
 Start
-	di
+	DISABLE_INTERRUPTS
+	DebugResetBorder
+	call TestDebug
+	ret
 	call MenuPageStart
-	ei
-
+	ENABLE_INTERRUPTS
 	ret
 
-
-
-
-; pause before exit, jp to here
-Pause:
+TestDebug	; works
+	DebugResetBorder
 	ld b,0
-.pause
-	ei : halt : di
-	djnz .pause
-	ret
-
-
-
-
-
-
-	include "menu.z80"
+.loop1	djnz .loop1
+.loop2	djnz .loop2
+.loop3	djnz .loop3
+.loop4	djnz .loop4
+	DebugBorder
+.loop11	djnz .loop11
+.loop12	djnz .loop12
+.loop13	djnz .loop13
+.loop14	djnz .loop14
+	DebugBorder
+.loop21	djnz .loop21
+.loop22	djnz .loop22
+.loop23	djnz .loop23
+.loop24	djnz .loop24
+	DebugBorder
+.loop31	djnz .loop31
+.loop32	djnz .loop32
+.loop33	djnz .loop33
+.loop34	djnz .loop34
+	DebugBorder
+	jr TestDebug
 
 
 
 ENDOFPROG
-	;SAVESNA "sud.sna",Start         ;save snapshot to file sud.sna Start address is Start ($8000)
-	;;
-;; Set up the Nex output
-;;
+	ifdef SNA
+		SAVESNA "sud.sna",Start         ;save snapshot to file sud.sna Start address is Start ($8000)
+	else
+		; Set up the Nex output
+		; This sets the name of the project, the start address, 
+		; and the initial stack pointer.
+		SAVENEX OPEN "sud.nex", Start, stack_top
 
-	; This sets the name of the project, the start address, 
-	; and the initial stack pointer.
-	SAVENEX OPEN "sud.nex", Start, $ff40
+		; This asserts the minimum core version.  Set it to the core version 
+		; you are developing on.
+		SAVENEX CORE 2,0,0
 
-	; This asserts the minimum core version.  Set it to the core version 
-	; you are developing on.
-	SAVENEX CORE 2,0,0
+		; This sets the border colour while loading (in this case white),
+		; what to do with the file handle of the nex file when starting (0 = 
+		; close file handle as we're not going to access the project.nex 
+		; file after starting.  See sjasmplus documentation), whether
+		; we preserve the next registers (0 = no, we set to default), and 
+		; whether we require the full 2MB expansion (0 = no we don't).
+		SAVENEX CFG 0,0,0,0
 
-	; This sets the border colour while loading (in this case white),
-	; what to do with the file handle of the nex file when starting (0 = 
-	; close file handle as we're not going to access the project.nex 
-	; file after starting.  See sjasmplus documentation), whether
-	; we preserve the next registers (0 = no, we set to default), and 
-	; whether we require the full 2MB expansion (0 = no we don't).
-	SAVENEX CFG 0,0,0,0
-
-	; Generate the Nex file automatically based on which pages you use.
-	SAVENEX AUTO
-	labelslist "sud.lst"
-
+		; Generate the Nex file automatically based on which pages you use.
+		SAVENEX AUTO
+		;labelslist "sud.lst"
+	endif

@@ -6,10 +6,8 @@ MenuPageStart
 	ld ix, Menu_Text_Start : call Print_String		; print options
 	call PrintMbs						; print madebyme
 	ld hl, Menu_Main : call MenuReadKeys
-	cp 0
-	ret z							; selected start game
-	dec a
-	jr z, MenuPageOptions					; selected options menu
+	cp 0 : ret z						; selected start game
+	dec a : jr z, MenuPageOptions				; selected options menu
 	ret							; else must be quit game
 
 
@@ -100,7 +98,7 @@ SetKey	; a = index into Input_Custom, D = port, E = mask
 DefineKeysPause	; Returns A = 0 else A = ascii, Trashed bc, de, hl
 	ld b,20
 .definePauseLoop
-	halt
+	DebugResetBorder
 	call Read_Keyboard
 	and a
 	ret nz
@@ -163,6 +161,7 @@ MenuDefineCharColour	; a = colour, de = 2 * index of char to colour, trashed hl
 
 ; Draw the top centre gfx in the menu
 DrawMenuGfx	; trashed a, bc, de & hl
+	DebugBorder
 	ld bc, $0008 : call GetAttrAddress
 	ld a, pBlack | Green : ld bc, $030c : call Fill_Attr
 	ld bc, $0014 : call GetAttrAddress
@@ -173,6 +172,7 @@ DrawMenuGfx	; trashed a, bc, de & hl
 	ld hl, $0008
 	ld bc, $1020
 	call Draw
+	DebugBorder
 	ret
 
 
@@ -270,7 +270,7 @@ menuHighlightCounted
 	pop hl							; get attr address and stack is sane
 	pop af
 	ld b, 1 : call Fill_Attr				; draw attr
-	ei : halt : di						; show it
+	DebugResetBorder					; show it
 	ret
 
 
@@ -279,6 +279,7 @@ PlayerAnimDataDir	db 0,0,$3f	; current direction, current delay before change co
 PlayerAnimGfx	dw PlayerDownAnim, PlayerRightAnim, PlayerUpAnim, PlayerLeftAnim
 
 DrawMenuAnim
+	DebugBorder
 	ld ix,PlayerAnimDataDir
 	ld a,(ix+1)
 	inc a
@@ -298,26 +299,26 @@ DrawMenuAnim
 	add hl,de
 	ld e,(hl) : inc hl : ld d,(hl) : ex de,hl
 	call DrawMenuPlayer
+	DebugBorder
 	ret
 
 DrawMenuPlayer
 	;ld hl,PlayerDownAnim			; array of 4 words pointing to each 16x16 pix image
 	ld a,(PlayerAnimDataFrames)
-	add a,a
-	ld e, a
-	ld d,0
-	add hl,de				; hl points to current pointer to image
-	ld e,(hl) : inc hl : ld d,(hl)		; de = 16x16 pixel image
-	ld hl,$0204				; y,x position
+	add a,a : ld e, a
+	ld d,0 : add hl,de			; hl points to current pointer to image
+	ld e,(hl) : inc hl : ld d,(hl)
+	ld hl,$1004				; y,x position
 	ld bc,$0210				; 2 bytes wide, 16 pixels tall
 	push de : push bc
-	halt : call Draw
-	pop bc : pop de : ld hl,$021a
-	call Draw
+	DebugResetBorder : call Draw
+	pop bc : pop de
+	ld hl,$101a : call Draw
 	ld hl,PlayerAnimDataFrames+2
 	ld a,(PlayerAnimDataFrames + 1) : inc a : ld (PlayerAnimDataFrames + 1),a : and (hl) : jr nz,.noNxtFrame
 	ld a,(PlayerAnimDataFrames) : inc a : and 3 : ld (PlayerAnimDataFrames),a
 .noNxtFrame
+	DebugBorder
 	ret
 
 
@@ -396,7 +397,3 @@ MainMenuGfx
 	db %11111111, %11111111, %11111111, %00011111, %11111111, %11111111, %11100001, %11111111, %11111111, %11111100, %10000000, %00000000, %00000100, %01111111, %11111111, %11111100
 
 
-	include "lib/output.z80"
-	include "lib/attr.z80"
-	include "lib/keyboard.z80"
-	include "gfx.z80"

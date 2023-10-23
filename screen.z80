@@ -1,0 +1,85 @@
+
+FpsCount equ 23672
+
+TimeToDraw	db 0		; 1 draw the screem 0 don't this time
+TiledGfx	db 0		; 1 = do tiled graphics, 0 don't
+CustomGfx	ds 33, 0        ; count + 16 words, pointers to finctios to call for custom graphics routines
+
+
+; set up interrupt driven drawing and sound
+EnableIM2
+	di                  ; interrupts off as a precaution.
+	ld a,254            ; high byte of pointer table location.
+	ld i,a              ; set high byte.
+	im2                 ; select interrupt mode 2.
+	ei                  ; enable interrupts.
+	ret
+
+
+	org 51400
+
+IM2Routine:  
+	push af : push hl
+	ld hl,SoundOn
+	ld a,(TimeToDraw)
+	or (hl)
+	and a
+	jr z,.nothingToDo
+
+	push bc : push de : push ix : push iy
+	exx : ex af, af'
+	push af : push hl : push bc : push de
+	
+	; inc fps counter
+	ld hl,FpsCount
+	inc (hl)
+
+	ld a,(SoundOn)
+	and a
+	jr z,.noSound
+	call          Music_Update
+.noSound
+	ld a,(TiledGfx)
+	and a
+	jr z,.noTiledGfx
+	call DoTiledGfx
+.noTiledGfx
+	ld a,(CustomGfx)
+	and a
+	jr z,.noCustomGfx
+	call DoCustomGfx
+
+.noCustomGfx
+	pop de : pop bc : pop hl : pop af
+	ex af, af' : exx
+	pop iy : pop ix : pop de : pop bc
+
+.nothingToDo
+	pop hl : pop af
+	ei
+	reti
+
+
+Music_Update
+        ret
+
+DoCustomGfx
+	ret
+
+DoTiledGfx
+	ret
+
+
+
+	org 65024
+
+	; pointers to interrupt routine. 129 + 1 
+	defb 200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200
+	defb 200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200
+	defb 200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200
+	defb 200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200
+	defb 200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200
+	defb 200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200
+	defb 200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200
+	defb 200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200
+	defb 200, 200
