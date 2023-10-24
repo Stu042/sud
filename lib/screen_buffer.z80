@@ -45,7 +45,6 @@ Get_Pixel_Address_B:	LD L,B				; Calculate Y2,Y1,Y0
 ; Fast clear-screen routine
 ; Uses the stack to block clear memory
 ; HL: Address of screen buffer
-;
 Clear_Screen_Fast:	LD (Clear_Screen_Fast_End+1),SP	; Store the stack (self modding code)
 			LD DE,0x1800
 			ADD HL,DE			; Move to end of buffer

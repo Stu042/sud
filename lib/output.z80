@@ -47,26 +47,36 @@ Draw
 
 
 
+MinSprite_X equ 0
+MinSprite_Y equ 1
+MinSprite_W equ 2
+MinSprite_H equ 3
+MinSprite_GFX equ 4
+MinSprite_GFXL equ 4
+MinSprite_GFXH equ 5
+MinSprite_SIZE equ 8
+
 ; Draw graphic to screen quickly, no checks, no masking just draw.
 ; IX points to data:
 ; 0,1               2,3       4,5
 ; x,y position, width,height, gfx (array of bytes to draw)
 ; trashes a, bc, de, hl
 DrawIx
-	ld c,(ix+1)
-	ld b,(ix+0)
+	ld c,(ix+MinSprite_Y)
+	ld b,(ix+MinSprite_X)
 	call GetScreenAddressBC
-	ld e,(ix+4)
-	ld d,(ix+5)
+	ld e,(ix+MinSprite_GFXL)
+	ld d,(ix+MinSprite_GFXH)
+	ld c,(ix+MinSprite_H)
 .vertLoop
 	push hl
+	ld b,(ix+MinSprite_W)
 .horizLoop
 	ld a,(de)
 	ld (hl),a
 	inc hl
 	inc de
 	djnz .horizLoop
-	ld b,(ix+0)
 	pop hl
 	call Pixel_Address_Down
 	dec c

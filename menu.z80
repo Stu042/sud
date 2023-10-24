@@ -161,7 +161,7 @@ MenuDefineCharColour	; a = colour, de = 2 * index of char to colour, trashed hl
 
 ; Draw the top centre gfx in the menu
 DrawMenuGfx	; trashed a, bc, de & hl
-	DebugBorder
+	CallDebugBorder
 	ld bc, $0008 : call GetAttrAddress
 	ld a, pBlack | Green : ld bc, $030c : call Fill_Attr
 	ld bc, $0014 : call GetAttrAddress
@@ -172,7 +172,7 @@ DrawMenuGfx	; trashed a, bc, de & hl
 	ld hl, $0008
 	ld bc, $1020
 	call Draw
-	DebugBorder
+	CallDebugBorder
 	ret
 
 
@@ -279,7 +279,7 @@ PlayerAnimDataDir	db 0,0,$3f	; current direction, current delay before change co
 PlayerAnimGfx	dw PlayerDownAnim, PlayerRightAnim, PlayerUpAnim, PlayerLeftAnim
 
 DrawMenuAnim
-	DebugBorder
+	CallDebugBorder
 	ld ix,PlayerAnimDataDir
 	ld a,(ix+1)
 	inc a
@@ -299,7 +299,7 @@ DrawMenuAnim
 	add hl,de
 	ld e,(hl) : inc hl : ld d,(hl) : ex de,hl
 	call DrawMenuPlayer
-	DebugBorder
+	CallDebugBorder
 	ret
 
 DrawMenuPlayer
@@ -318,7 +318,7 @@ DrawMenuPlayer
 	ld a,(PlayerAnimDataFrames + 1) : inc a : ld (PlayerAnimDataFrames + 1),a : and (hl) : jr nz,.noNxtFrame
 	ld a,(PlayerAnimDataFrames) : inc a : and 3 : ld (PlayerAnimDataFrames),a
 .noNxtFrame
-	DebugBorder
+	CallDebugBorder
 	ret
 
 

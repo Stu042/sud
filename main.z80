@@ -1,4 +1,4 @@
-	;define SNA
+	define SNA
 
 	ifndef SNA
 		DEVICE ZXSPECTRUMNEXT
@@ -7,51 +7,123 @@
 	endif
 	SLDOPT COMMENT WPMEM, LOGPOINT, ASSERTION
 	ORG $8000
-	jp Start
-stack_top equ $ff40
+
+stack_top equ $ffff
 
 	include "debug.z80"
 	include "menu.z80"
 	include "lib/output.z80"
 	include "lib/attr.z80"
 	include "lib/keyboard.z80"
+	include "lib/screen_buffer.z80"
 	include "gfx.z80"
+	include "screen.z80"
 
 
 
 Start
-	DISABLE_INTERRUPTS
-	DebugResetBorder
+	ld a,Yellow | pBlack
+	call Clear_Screen
+	call EnableIM2
 	call TestDebug
 	ret
 	call MenuPageStart
-	ENABLE_INTERRUPTS
 	ret
 
-TestDebug	; works
+; 16 across, 1 down
+; 2 wide, 16 height
+; gfx
+gfxTest dw $1001, $1002, PlayerGfxDown1
+
+
+
+TestDebug
 	DebugResetBorder
+
+	ld hl,$1001
+	ld bc,$0210
+	ld de, PlayerGfxDown1
+	call AddSprite
+
+	ld hl,$1201
+	ld bc,$0210
+	ld de, PlayerGfxDown2
+	call AddSprite
+
+	ld hl,$1401
+	ld bc,$0210
+	ld de, PlayerGfxDown3
+	call AddSprite
+
+	ld hl,$0518
+	ld bc,$0210
+	ld de, PlayerGfxUp1
+	call AddSprite
+
+	; ld hl,$0818
+	; ld bc,$0210
+	; ld de, PlayerGfxUp2
+	; call AddSprite
+
+	; ld hl,$0a18
+	; ld bc,$0210
+	; ld de, PlayerGfxUp3
+	; call AddSprite
+
+	; ld hl,$08a1
+	; ld bc,$0210
+	; ld de, PlayerGfxLeft1
+	; call AddSprite
+
+	; ld hl,$06a0
+	; ld bc,$0210
+	; ld de, PlayerGfxLeft2
+	; call AddSprite
+
+	; ld hl,$10a1
+	; ld bc,$0210
+	; ld de, PlayerGfxLeft3
+	; call AddSprite
+
+	; ld hl,$1eb0
+	; ld bc,$0210
+	; ld de, PlayerGfxRight1
+	; call AddSprite
+
+	jp TestDebug
+
+
+
 	ld b,0
 .loop1	djnz .loop1
 .loop2	djnz .loop2
 .loop3	djnz .loop3
 .loop4	djnz .loop4
-	DebugBorder
+	CallDebugBorder
 .loop11	djnz .loop11
 .loop12	djnz .loop12
 .loop13	djnz .loop13
 .loop14	djnz .loop14
-	DebugBorder
+	CallDebugBorder
 .loop21	djnz .loop21
 .loop22	djnz .loop22
 .loop23	djnz .loop23
 .loop24	djnz .loop24
-	DebugBorder
+	CallDebugBorder
 .loop31	djnz .loop31
 .loop32	djnz .loop32
 .loop33	djnz .loop33
 .loop34	djnz .loop34
-	DebugBorder
-	jr TestDebug
+	CallDebugBorder
+.loop41	djnz .loop41
+;.loop42	djnz .loop42
+;.loop43	djnz .loop43
+	CallDebugBorder
+.loop51	djnz .loop51
+; .loop52	djnz .loop52
+; .loop53	djnz .loop53
+	CallDebugBorder
+	jp TestDebug
 
 
 
@@ -78,5 +150,4 @@ ENDOFPROG
 
 		; Generate the Nex file automatically based on which pages you use.
 		SAVENEX AUTO
-		;labelslist "sud.lst"
 	endif

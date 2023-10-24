@@ -18,9 +18,13 @@ DebugColour	dc 0
 DebugResetBorder
 	call DebugBorder
 	xor a : ld (DebugColour),a
-	ei : halt : di : out (254),a
+	ifdef USING_INTERRUPTS
+		call WaitForFrame
+	else
+		ei : halt : di
+	endif
+	out (254),a
 	ret
-
 
 
 ; Change border colour whenever called, call DebugResetBorder at redraw
@@ -37,28 +41,22 @@ DebugBorder
 		macro DebugResetBorder
 			call DebugResetBorder
 		endm
-		macro DebugBorder
+		macro CallDebugBorder
 			call DebugBorder
 		endm
 	else
-		macro DebugResetBorder
-			ei : halt : di
-		endm
-		macro DebugBorder
-		endm
+		ifdef USING_INTERRUPTS
+			macro DebugResetBorder
+				call WaitForFrame
+			endm
+			macro CallDebugBorder
+			endm
+		else
+			macro DebugResetBorder
+				ei : halt : di
+			endm
+			macro CallDebugBorder
+			endm
+		endif
 	endif
 
-
-	ifdef USING_INTERRUPTS
-		macro ENABLE_INTERRUPTS
-			ei
-		endm
-		macro DISABLE_INTERRUPTS
-			di
-		endm
-	else
-		macro ENABLE_INTERRUPTS
-		endm
-		macro DISABLE_INTERRUPTS
-		endm
-	endif

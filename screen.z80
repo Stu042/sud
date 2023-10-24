@@ -1,66 +1,104 @@
 
+
 FpsCount equ 23672
+
+MAX_SPRITES	equ 16
 
 TimeToDraw	db 0		; 1 draw the screem 0 don't this time
 TiledGfx	db 0		; 1 = do tiled graphics, 0 don't
-CustomGfx	ds 33, 0        ; count + 16 words, pointers to finctios to call for custom graphics routines
+CustomGfx	ds 33, 0	; count + 16 words, pointers to functions to call for custom graphics routines
+SpritesGfxCounter	db 0		; sprite count
+SpritesGfx	ds MAX_SPRITES*8, 0	; 16 min sprite data segments containing: x,y position, width,height, gfx (array of bytes to draw) + 00 padding, so multiple of 8
+
+
+
 
 
 ; set up interrupt driven drawing and sound
 EnableIM2
-	di                  ; interrupts off as a precaution.
-	ld a,254            ; high byte of pointer table location.
-	ld i,a              ; set high byte.
-	im2                 ; select interrupt mode 2.
-	ei                  ; enable interrupts.
+	di			; interrupts off as a precaution.
+	ld a,254		; high byte of pointer table location.
+	ld i,a			; set high byte.
+	im 2			; select interrupt mode 2.
+	ei			; enable interrupts.
 	ret
 
 
+
+; if running im 2 interupts this will wait for the interrupt to of been called
+WaitForFrame
+	ld a,(FpsCount)
+	ld hl,(PrevFrame)
+	and (hl)
+	jr z, WaitForFrame
+	ld a,(FpsCount) : ld (hl),a
+	ret
+PrevFrame db 0
+
+
+; 0,1               2,3       4,5
+; x,y position, width,height, gfx (array of bytes to draw)
+; h,l (position) b,c (width,height), de gfx, 00 padding
+; Called out of the interrupt, adds data for interrupt to use
+; trashed all, except iy
+AddSprite
+	ld a,(SpritesGfxCounter) : cp MAX_SPRITES - 1 : ret z		; if we are at the limit, dont add too many sprites
+	and a : rla : rla : rla
+	push de
+	ld e,a : ld d,0
+	ld ix,SpritesGfx
+	add ix,de
+	pop de
+	ld (ix+MinSprite_X), l
+	ld (ix+MinSprite_Y), h
+	ld (ix+MinSprite_W), b
+	ld (ix+MinSprite_H), c
+	ld (ix+MinSprite_GFXL), e
+	ld (ix+MinSprite_GFXH), d
+	ld a,(SpritesGfxCounter) : inc a : ld (SpritesGfxCounter),a
+	ld a,1 : ld (TimeToDraw),a
+	ret
+
+
+
 	org 51400
-
-IM2Routine:  
-	push af : push hl
-	ld hl,SoundOn
-	ld a,(TimeToDraw)
-	or (hl)
-	and a
-	jr z,.nothingToDo
-
-	push bc : push de : push ix : push iy
+IM2Routine:
+	push af : push hl : push bc : push de : push ix : push iy
 	exx : ex af, af'
 	push af : push hl : push bc : push de
 	
+	CallDebugBorder
 	; inc fps counter
-	ld hl,FpsCount
-	inc (hl)
+	ld hl,FpsCount : inc (hl)
+	ld hl,SoundOn : ld a,(TimeToDraw) : or (hl) : jr z,.nothingToDo
 
-	ld a,(SoundOn)
-	and a
-	jr z,.noSound
-	call          Music_Update
+	ld a,(SoundOn) : and a : jr z,.noSound
+	call MusicUpdate
 .noSound
-	ld a,(TiledGfx)
-	and a
-	jr z,.noTiledGfx
+	ld a,(TiledGfx) : and a : jr z,.noTiledGfx
 	call DoTiledGfx
 .noTiledGfx
-	ld a,(CustomGfx)
-	and a
-	jr z,.noCustomGfx
+	ld a,(CustomGfx) : and a : jr z,.noCustomGfx
 	call DoCustomGfx
-
 .noCustomGfx
+	ld a,(SpritesGfx) : and a : jr z,.noSpritesGfx
+	call DoSpritesGfx
+.noSpritesGfx
+	xor a : ld (TimeToDraw),a		; no longer time to draw
+.nothingToDo
+	CallDebugBorder
 	pop de : pop bc : pop hl : pop af
 	ex af, af' : exx
-	pop iy : pop ix : pop de : pop bc
-
-.nothingToDo
-	pop hl : pop af
+	pop iy : pop ix : pop de : pop bc : pop hl : pop af
 	ei
 	reti
 
 
-Music_Update
+; all below subroutines are self contained and dont need to preserve any registers
+; assume all will be called with rubbish in the registers
+
+
+MusicUpdate
         ret
 
 DoCustomGfx
@@ -70,10 +108,25 @@ DoTiledGfx
 	ret
 
 
+DoSpritesGfx
+	ld a,(SpritesGfxCounter) : and a : ret z
+	ld b,a
+	ld ix,SpritesGfx
+	ld de,MinSprite_SIZE
+.loop
+	push de : push bc : push ix
+	call DrawIx
+	pop ix : pop bc : pop de
+	add ix,de
+	djnz .loop
+	xor a : ld (SpritesGfxCounter),a
+	ret
+
+
+
 
 	org 65024
-
-	; pointers to interrupt routine. 129 + 1 
+	; pointers to interrupt routine (IM2Routine). 129 + 1 
 	defb 200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200
 	defb 200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200
 	defb 200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200
@@ -82,4 +135,4 @@ DoTiledGfx
 	defb 200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200
 	defb 200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200
 	defb 200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200
-	defb 200, 200
+	defb 200,200
